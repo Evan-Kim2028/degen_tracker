@@ -65,6 +65,7 @@ class LanceDBLogs:
         client = Hypersync()
 
         while True:
+            # TODO - make it so it reads the latest block and creates a dynamic range.
             erc20_logs_df: pl.DataFrame = client.get_erc20_df()
 
             # Perform a "upsert" operation
