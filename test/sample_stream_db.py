@@ -6,8 +6,8 @@ lance_logs = LanceDBLogs()
 
 
 # initial db sync. If the DB already exists, then this will be skipped.
-lance_logs.initial_db_sync(full_sync=False)
+lance_logs.initial_db_sync(full_sync=False, block_num_range=5000)
 
 # print('STARTING TO UPDATE DB CONTINUOUSLY')
-# # update the logs database every 5 seconds.
-# lance_logs.update_db(refresh_rate=5)
+# update the logs database every 5 seconds.
+lance_logs.update_db(refresh_rate=5)

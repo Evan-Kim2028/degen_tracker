@@ -13,5 +13,5 @@ type file that allows for mutability, unlike parquet files.
 3. Activate the virtual environment with the command `source .venv/bin/activate`.
 
 ### Running the code
-run `start_lance.py` to get started streaming queried logs data into a database.
+run `sample_stream_db.py` to get started streaming queried logs data into a database. Then run `stream_metrics.py` to stream a counting metric in real time.
 
