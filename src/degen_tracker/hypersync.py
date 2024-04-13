@@ -29,7 +29,16 @@ class Hypersync:
             # Convert hex string to float
             return float(int(hex, 16))
 
-    def get_erc20_df(self, sync_all=False) -> pl.DataFrame:
+    async def get_block_height(self) -> int:
+        """
+        Get the current block height from the blockchain.
+
+        Returns:
+            int: The current block height.
+        """
+        return await self.client.get_height()
+
+    def get_erc20_df(self, block_number: int = None, sync_all=False, block_num_range: int = 10) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
@@ -45,11 +54,20 @@ class Hypersync:
                     "block_data": block_data
                 }
         """
+        match block_number:
+            case None:
+                # Get the current block height from the blockchain.
+                height = asyncio.run(self.get_block_height())
+            case _:
+                height = block_number
+
         match sync_all:
             case True:
-                data_dict = asyncio.run(self.fetch_erc20s(sync_all=True))
+                data_dict = asyncio.run(self.fetch_erc20s(
+                    height, block_num_range, sync_all=True))
             case False:
-                data_dict = asyncio.run(self.fetch_erc20s(sync_all=False))
+                data_dict = asyncio.run(self.fetch_erc20s(
+                    height, block_num_range, sync_all=False))
 
         # data transformations
         joined_logs = []
@@ -81,7 +99,7 @@ class Hypersync:
 
         return logs_df.join(tx_df, on=["tx_hash", 'block_number'], how="left").rename({'body': 'value_transferred'})
 
-    async def fetch_erc20s(self, sync_all=False) -> dict[str]:
+    async def fetch_erc20s(self, block_number: int, block_num_range: int, sync_all=False, ) -> dict[str]:
         """
             - TODO get latest block header from lance database and update
 
@@ -94,15 +112,13 @@ class Hypersync:
                         "block_data": block_data
                     }
             """
-        # Get the current block height from the blockchain.
-        height = await self.client.get_height()
 
         match sync_all:
             case True:
                 query = hypersync.Query(
                     # Full sync
                     from_block=0,
-                    to_block=height,
+                    to_block=block_number,
                     logs=[hypersync.LogSelection(
                         # We want All ERC20 transfers so no address filter and only a filter for the first topic
                         topics=[
@@ -121,10 +137,9 @@ class Hypersync:
                 )
             case False:
                 query = hypersync.Query(
-                    # Full sync
-                    # from_block=0,
-                    # to_block=height,
-                    from_block=height - 3000,
+                    # partial sync
+                    to_block=block_number,
+                    from_block=block_number - block_num_range,
                     logs=[hypersync.LogSelection(
                         # We want All ERC20 transfers so no address filter and only a filter for the first topic
                         topics=[
