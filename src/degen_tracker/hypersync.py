@@ -1,5 +1,6 @@
 import asyncio
 import hypersync
+import os
 import polars as pl
 from dataclasses import dataclass, field
 from typing import List
@@ -172,8 +173,14 @@ class Hypersync:
         while True:
             res = await self.client.send_req(query)
 
-            # ABI is required to decode logs
-            with open('./abis/erc20.json', 'r') as json_file:
+            # Determine the directory containing the current script
+            base_dir = os.path.dirname(__file__)
+
+            # Build the path to the JSON file
+            file_path = os.path.join(base_dir, 'abis', 'erc20.json')
+
+            # Now you can safely open the file with the path
+            with open(file_path, 'r') as json_file:
                 abi = json_file.read()
 
             # Map of contract_address -> abi
