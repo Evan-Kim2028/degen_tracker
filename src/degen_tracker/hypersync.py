@@ -29,11 +29,11 @@ class Hypersync:
             # Convert hex string to float
             return float(int(hex, 16))
 
-    def sync_erc20s(self, sync_all=False) -> dict[str]:
+    def get_erc20_df(self, sync_all=False) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
-        sync is a boolean value that determines whether to sync all erc20 transfers from block 0 or from the latest block. It is False by default. 
+        sync is a boolean value that determines whether to sync all erc20 transfers from block 0 or from the latest block. It is False by default.
         If false, it will simply sync to the block head.
 
         Returns:
@@ -47,23 +47,53 @@ class Hypersync:
         """
         match sync_all:
             case True:
-                return asyncio.run(self.fetch_erc20s(sync_all=True))
+                data_dict = asyncio.run(self.fetch_erc20s(sync_all=True))
             case False:
-                return asyncio.run(self.fetch_erc20s(sync_all=False))
+                data_dict = asyncio.run(self.fetch_erc20s(sync_all=False))
+
+        # data transformations
+        joined_logs = []
+
+        for i in range(len(data_dict["log_data"])):
+            log = {
+                "block_number": data_dict["log_data"][i].block_number,
+                "tx_hash": data_dict["log_data"][i].transaction_hash,
+                "indexed": data_dict["decoded_log_data"][i].indexed,
+                # contains value transferred. Make float to avoid overflow errors
+                "body": float(data_dict["decoded_log_data"][i].body[0]),
+            }
+            joined_logs.append(log)
+
+        tx_data = []
+
+        for tx in data_dict["tx_data"]:
+            tx_data.append(
+                {
+                    "tx_hash": tx.hash,
+                    "block_number": tx.block_number,
+                    "from": tx.from_,
+                    "to": tx.to,
+                }
+            )
+
+        logs_df = pl.from_dicts(joined_logs)
+        tx_df = pl.from_dicts(tx_data)
+
+        return logs_df.join(tx_df, on=["tx_hash", 'block_number'], how="left").rename({'body': 'value_transferred'})
 
     async def fetch_erc20s(self, sync_all=False) -> dict[str]:
         """
-        - TODO get latest block header from lance database and update
+            - TODO get latest block header from lance database and update
 
-        Returns:
-            dict: A dictionary containing the following keys:
-                {
-                    "tx_data": tx_data,
-                    "decoded_log_data": decoded_log_data,
-                    "log_data": log_data,
-                    "block_data": block_data
-                }
-        """
+            Returns:
+                dict: A dictionary containing the following keys:
+                    {
+                        "tx_data": tx_data,
+                        "decoded_log_data": decoded_log_data,
+                        "log_data": log_data,
+                        "block_data": block_data
+                    }
+            """
         # Get the current block height from the blockchain.
         height = await self.client.get_height()
 
@@ -146,7 +176,6 @@ class Hypersync:
             log_data = res.data.logs
             block_data += res.data.blocks
 
-            print('out of for loop?')
             # Check if the fetched data has reached the current archive height or next block.
             if res.archive_height < res.next_block:
                 break
