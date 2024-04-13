@@ -20,7 +20,13 @@ class LanceDBLogs:
         if self.db is None:
             self.logs_tbl = None
         else:
-            self.logs_tbl = self.db.open_table(self.uri)
+            try:
+                # Try to open the existing table
+                self.logs_tbl = self.db.open_table(self.uri)
+            except FileNotFoundError:
+                # Handle the case where the table does not exist
+                # print(f"Table {self.uri} does not exist. Consider creating it if this is expected.")
+                self.logs_tbl = None
 
     def initial_db_sync(self, full_sync=False):
         """
