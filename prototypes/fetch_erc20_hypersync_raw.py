@@ -16,9 +16,7 @@ async def fetch_erc20s():
     # The query to run
     query = hypersync.Query(
         # Full sync
-        # from_block=0,
-        # to_block=height,
-        from_block=height - 1000,
+        from_block=0,
         logs=[hypersync.LogSelection(
             # We want All ERC20 transfers so no address filter and only a filter for the first topic
             topics=[
@@ -43,7 +41,7 @@ async def fetch_erc20s():
         res = await client.send_req(query)
 
         # read json abi file for erc20
-        with open('./erc20.json', 'r') as json_file:
+        with open('./src/degen_tracker/abis/erc20.json', 'r') as json_file:
             abi = json_file.read()
 
         # Map of contract_address -> abi
@@ -75,11 +73,11 @@ async def fetch_erc20s():
         query.from_block = res.next_block
         print(f"Scanned up to block {query.from_block}")  # Log progress.
 
-        print(log_data[0])
-        print(log_data[0].body)
-        print(log_data[0].indexed)
+        # print(log_data[0])
+        # print(log_data[0].body)
+        # print(log_data[0].indexed)
 
-        print(res.data.transactions[0])
+        # print(res.data.transactions[0])
         # print(res.data.blocks[0])
         print("# of logs", len(log_data))
         print('# of blocks', len(block_data))

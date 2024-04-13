@@ -28,7 +28,7 @@ class LanceDBLogs:
                     f"Table {self.uri} does not exist. Consider creating it if this is expected.")
                 self.logs_tbl = None
 
-    def initial_db_sync(self, full_sync: bool = False):
+    def initial_db_sync(self, full_sync: bool = False, block_num_range=50000):
         """
         Initializes the database and syncs the logs table based on the specified sync range.
 
@@ -46,7 +46,8 @@ class LanceDBLogs:
             case True:
                 erc20_logs_df = client.get_erc20_df(sync_all=True)
             case False:
-                erc20_logs_df = client.get_erc20_df(sync_all=False, block_num_range=5000)
+                erc20_logs_df = client.get_erc20_df(
+                    sync_all=False, block_num_range=block_num_range)
 
         try:
             # Attempt to create the table if it doesn't exist
@@ -61,7 +62,7 @@ class LanceDBLogs:
                 # If the error is due to another reason, re-raise the exception
                 raise
 
-    def update_db(self, refresh_rate: int = 5):
+    def update_db(self, refresh_rate: int = 5, block_num_range=500):
         """
         Constantly streams new data to update the logs database.
         `refresh_rate` is the number of seconds to wait before the next call.
@@ -72,7 +73,8 @@ class LanceDBLogs:
 
         while True:
             # TODO - make it so it reads the latest block and creates a dynamic range.
-            erc20_logs_df: pl.DataFrame = client.get_erc20_df()
+            erc20_logs_df: pl.DataFrame = client.get_erc20_df(
+                sync_all=False, block_num_range=block_num_range)
 
             # Perform a "upsert" operation
             self.logs_tbl.merge_insert("block_number")   \

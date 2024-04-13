@@ -39,7 +39,7 @@ class Hypersync:
         """
         return await self.client.get_height()
 
-    def get_erc20_df(self, sync_all: bool, block_num_range: int = 0) -> pl.DataFrame:
+    def get_erc20_df(self, sync_all: bool, block_num_range: int = 5000) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
