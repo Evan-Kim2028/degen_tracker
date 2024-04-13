@@ -39,7 +39,7 @@ class Hypersync:
         """
         return await self.client.get_height()
 
-    def get_erc20_df(self, block_number: int = None, sync_all=False, block_num_range: int = 10) -> pl.DataFrame:
+    def get_erc20_df(self, sync_all: bool, block_num_range: int = 0) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
@@ -55,20 +55,15 @@ class Hypersync:
                     "block_data": block_data
                 }
         """
-        match block_number:
-            case None:
-                # Get the current block height from the blockchain.
-                height = asyncio.run(self.get_block_height())
-            case _:
-                height = block_number
+        height = asyncio.run(self.get_block_height())
 
         match sync_all:
             case True:
-                data_dict = asyncio.run(self.fetch_erc20s(
-                    height, block_num_range, sync_all=True))
+                data_dict = asyncio.run(self.fetch_erc20s(sync_all=True, block_number=height,
+                                                          block_num_range=block_num_range))
             case False:
-                data_dict = asyncio.run(self.fetch_erc20s(
-                    height, block_num_range, sync_all=False))
+                data_dict = asyncio.run(self.fetch_erc20s(sync_all=False, block_number=height,
+                                                          block_num_range=block_num_range))
 
         # data transformations
         joined_logs = []
@@ -103,7 +98,7 @@ class Hypersync:
 
         return logs_df.join(tx_df, on=["tx_hash", 'block_number'], how="left").rename({'body': 'value_transferred'})
 
-    async def fetch_erc20s(self, block_number: int, block_num_range: int, sync_all=False, ) -> dict[str]:
+    async def fetch_erc20s(self, sync_all: bool, block_number: int, block_num_range: int) -> dict[str]:
         """
             - TODO get latest block header from lance database and update
 
@@ -119,10 +114,10 @@ class Hypersync:
 
         match sync_all:
             case True:
+                print('full sync!')
                 query = hypersync.Query(
                     # Full sync
                     from_block=0,
-                    to_block=block_number,
                     logs=[hypersync.LogSelection(
                         # We want All ERC20 transfers so no address filter and only a filter for the first topic
                         topics=[
@@ -142,7 +137,7 @@ class Hypersync:
             case False:
                 query = hypersync.Query(
                     # partial sync
-                    to_block=block_number,
+                    # to_block=block_number,
                     from_block=block_number - block_num_range,
                     logs=[hypersync.LogSelection(
                         # We want All ERC20 transfers so no address filter and only a filter for the first topic
@@ -196,25 +191,24 @@ class Hypersync:
             # Can also use decoder.decode_logs_sync if it is more convenient.
             decoded_logs = await decoder.decode_logs(res.data.logs)
 
-            tx_data += res.data.transactions
-            decoded_log_data += decoded_logs
-            log_data = res.data.logs
-            block_data += res.data.blocks
+            # Accumulate data from response
+            tx_data.extend(res.data.transactions)
+            decoded_log_data.extend(decoded_logs)
+            log_data.extend(res.data.logs)
+            block_data.extend(res.data.blocks)
 
             # Check if the fetched data has reached the current archive height or next block.
             if res.archive_height < res.next_block:
+                # Exit the loop if the end of the period (or the blockchain's current height) is reached.
                 break
 
             # Update the query to fetch the next set of data starting from the next block.
             query.from_block = res.next_block
             print(f"Scanned up to block {query.from_block}")  # Log progress.
 
-            print("# of logs", len(log_data))
-            print('# of blocks', len(block_data))
-
-            return {
-                "tx_data": tx_data,
-                "decoded_log_data": decoded_log_data,
-                "log_data": log_data,
-                "block_data": block_data
-            }
+        return {
+            "tx_data": tx_data,
+            "decoded_log_data": decoded_log_data,
+            "log_data": log_data,
+            "block_data": block_data
+        }

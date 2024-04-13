@@ -12,7 +12,6 @@ class LanceDBLogs:
     # 1. connect to lancedb and initialize a lance table an initial query
     uri: str = "logs"
     db: lancedb.DBConnection = lancedb.connect(uri)
-    # error when trying to create table, it already exists.
     logs_tbl = None
 
     def __post_init__(self):
@@ -25,28 +24,29 @@ class LanceDBLogs:
                 self.logs_tbl = self.db.open_table(self.uri)
             except FileNotFoundError:
                 # Handle the case where the table does not exist
-                # print(f"Table {self.uri} does not exist. Consider creating it if this is expected.")
+                print(
+                    f"Table {self.uri} does not exist. Consider creating it if this is expected.")
                 self.logs_tbl = None
 
-    def initial_db_sync(self, full_sync=False):
+    def initial_db_sync(self, full_sync: bool = False):
         """
-        Call this function first to create the database and sync the logs table. 
+        Initializes the database and syncs the logs table based on the specified sync range.
 
-        full_sync=False defaults to a 10000 block range sync. Use this to get started.
-        full_sync=True if you want to sync the entire history.
+        Parameters:
+        - full_sync (bool): If True, synchronizes the entire history. If False, synchronizes the last 5000 blocks.
+        Defaults to False, which syncs a 5000 block range for initial setup.
 
-        Use full_sync=False
+        Example:
+        - Use full_sync=True to sync the entire history.
+        - Use full_sync=False to perform a quick initial sync of the last 5000 blocks.
         """
         client = Hypersync()
 
         match full_sync:
             case True:
-                erc20_logs_df: pl.DataFrame = client.get_erc20_df(
-                    sync_all=full_sync)
+                erc20_logs_df = client.get_erc20_df(sync_all=True)
             case False:
-                # sync to head with a 1000 range
-                erc20_logs_df: pl.DataFrame = client.get_erc20_df(
-                    sync_all=full_sync, block_num_range=10000)
+                erc20_logs_df = client.get_erc20_df(sync_all=False, block_num_range=5000)
 
         try:
             # Attempt to create the table if it doesn't exist
