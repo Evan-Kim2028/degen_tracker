@@ -71,6 +71,9 @@ class Hypersync:
 
         # data transformations
         joined_logs = []
+        # check if data_dict["log_data"] is None. If it is, then pass
+        if data_dict["log_data"] is None:
+            return pl.DataFrame()
 
         for i in range(len(data_dict["log_data"])):
             log = {
