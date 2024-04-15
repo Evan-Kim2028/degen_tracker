@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import lancedb
 import polars as pl
@@ -28,7 +29,7 @@ class LanceDBLogs:
                     f"Table {self.uri} does not exist. Consider creating it if this is expected.")
                 self.logs_tbl = None
 
-    def initial_db_sync(self, full_sync: bool = False, block_num_range=50000):
+    def db_sync(self, start_block: int, end_block: int = None, block_chunks=10000):
         """
         Initializes the database and syncs the logs table based on the specified sync range.
 
@@ -42,53 +43,56 @@ class LanceDBLogs:
         """
         client = Hypersync()
 
-        match full_sync:
-            case True:
-                erc20_logs_df = client.get_erc20_df(sync_all=True)
-            case False:
-                erc20_logs_df = client.get_erc20_df(
-                    sync_all=False, block_num_range=block_num_range)
+        # block height is most recent block height if not specified
+        if end_block is None:
+            end_block: int = asyncio.run(client.get_block_height())
 
+        for block in range(start_block, end_block, block_chunks):
+            print('block')
+            erc20_logs_df = None
+            progress_percent = (block / end_block) * 100
+            print('progress: ', round(progress_percent, 3), '%')
+            erc20_logs_df = client.get_erc20_df(
+                sync_all=True, start_block=block, end_block=block+block_chunks)
+            # update db based on chunked info
+            self.update_db(erc20_logs_df)
+
+    def create_db(self, df: pl.DataFrame):
+        """
+        Attempt to create initial lancedb if it doesn't exist.
+        """
         try:
             # Attempt to create the table if it doesn't exist
             self.logs_tbl = self.db.create_table(
-                self.uri, data=erc20_logs_df)
+                self.uri, data=df)
         except OSError as e:
             # Check if the error message is about the dataset already existing
             if "Dataset already exists" in str(e):
+                pass
                 # Skip table creation because it already exists
-                print("Table already exists, skipping creation.")
+                # print("Table already exists, skipping creation.")
             else:
                 # If the error is due to another reason, re-raise the exception
                 raise
 
-    def update_db(self, refresh_rate: int = 5, block_num_range=500):
+    def update_db(self, update_df: pl.DataFrame, merge_on: str = "block_number"):
         """
-        Constantly streams new data to update the logs database.
-        `refresh_rate` is the number of seconds to wait before the next call.
-
-        This function assumes that the initial_db_sync has already been called.
+        `update_db` performs an "upsert" operation on the logs table.
         """
-        client = Hypersync()
 
-        while True:
-            # TODO - make it so it reads the latest block and creates a dynamic range.
-            erc20_logs_df: pl.DataFrame = client.get_erc20_df(
-                sync_all=False, block_num_range=block_num_range)
+        # check if db exists. If it doesn't, then create it
+        self.create_db(update_df)
 
-            # Perform a "upsert" operation
-            self.logs_tbl.merge_insert("block_number")   \
-                .when_not_matched_insert_all() \
-                .execute(erc20_logs_df)
+        # Perform a "upsert" operation
+        self.logs_tbl.merge_insert(merge_on)   \
+            .when_not_matched_insert_all() \
+            .execute(update_df)
 
-            # lance db cleanup
-            # make table fragments compact
-            # 1m target rows per file
-            self.logs_tbl.compact_files(target_rows_per_fragment=1000000)
+        # lance db cleanup
+        # make table fragments compact
+        # 1m target rows per file
+        # self.logs_tbl.compact_files(target_rows_per_fragment=1000000)
 
-            self.logs_tbl.cleanup_old_versions(
-                older_than=datetime.timedelta(seconds=30), delete_unverified=True
-            )
-
-            print(f'sleeping for {refresh_rate} seconds')
-            time.sleep(refresh_rate)
+        self.logs_tbl.cleanup_old_versions(
+            older_than=datetime.timedelta(seconds=600), delete_unverified=True
+        )

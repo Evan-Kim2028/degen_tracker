@@ -39,12 +39,15 @@ class Hypersync:
         """
         return await self.client.get_height()
 
-    def get_erc20_df(self, sync_all: bool, block_num_range: int = 5000) -> pl.DataFrame:
+    def get_erc20_df(self, sync_all: bool, start_block: int, end_block: int) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
         sync is a boolean value that determines whether to sync all erc20 transfers from block 0 or from the latest block. It is False by default.
         If false, it will simply sync to the block head.
+
+        block_start is the block number to start syncing from
+        block_end is the block number to end syncing at
 
         Returns:
             dict: A dictionary containing the following keys:
@@ -55,15 +58,14 @@ class Hypersync:
                     "block_data": block_data
                 }
         """
-        height = asyncio.run(self.get_block_height())
 
         match sync_all:
             case True:
-                data_dict = asyncio.run(self.fetch_erc20s(sync_all=True, block_number=height,
-                                                          block_num_range=block_num_range))
+                data_dict = asyncio.run(self.fetch_erc20s(start_block=start_block,
+                                                          end_block=end_block))
             case False:
-                data_dict = asyncio.run(self.fetch_erc20s(sync_all=False, block_number=height,
-                                                          block_num_range=block_num_range))
+                data_dict = asyncio.run(self.fetch_erc20s(start_block=start_block,
+                                                          end_block=end_block))
 
         # data transformations
         joined_logs = []
@@ -98,7 +100,7 @@ class Hypersync:
 
         return logs_df.join(tx_df, on=["tx_hash", 'block_number'], how="left").rename({'body': 'value_transferred'})
 
-    async def fetch_erc20s(self, sync_all: bool, block_number: int, block_num_range: int) -> dict[str]:
+    async def fetch_erc20s(self, start_block: int, end_block: int) -> dict[str]:
         """
             - TODO get latest block header from lance database and update
 
@@ -112,51 +114,25 @@ class Hypersync:
                     }
             """
 
-        match sync_all:
-            case True:
-                print('full sync!')
-                query = hypersync.Query(
-                    # Full sync
-                    from_block=0,
-                    logs=[hypersync.LogSelection(
-                        # We want All ERC20 transfers so no address filter and only a filter for the first topic
-                        topics=[
-                            ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]]
-                    )],
-                    field_selection=hypersync.FieldSelection(
-                        log=[el.value for el in LogField],
-                        transaction=[TransactionField.BLOCK_NUMBER,
-                                     TransactionField.TRANSACTION_INDEX,
-                                     TransactionField.HASH,
-                                     TransactionField.FROM,
-                                     TransactionField.TO
-                                     ],
-                        block=[el.value for el in hypersync.BlockField]
-                    )
-                )
-            case False:
-                query = hypersync.Query(
-                    # partial sync
-                    # to_block=block_number,
-                    from_block=block_number - block_num_range,
-                    logs=[hypersync.LogSelection(
-                        # We want All ERC20 transfers so no address filter and only a filter for the first topic
-                        topics=[
-                            ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]]
-                    )],
-                    field_selection=hypersync.FieldSelection(
-                        log=[el.value for el in LogField],
-                        transaction=[TransactionField.BLOCK_NUMBER,
-                                     TransactionField.TRANSACTION_INDEX,
-                                     TransactionField.HASH,
-                                     TransactionField.FROM,
-                                     TransactionField.TO
-                                     ],
-                        block=[el.value for el in hypersync.BlockField]
-                    )
-                )
-
-        print("Running the query...")
+        query = hypersync.Query(
+            to_block=end_block,
+            from_block=start_block,
+            logs=[hypersync.LogSelection(
+                # We want All ERC20 transfers so no address filter and only a filter for the first topic
+                topics=[
+                    ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]]
+            )],
+            field_selection=hypersync.FieldSelection(
+                log=[el.value for el in LogField],
+                transaction=[TransactionField.BLOCK_NUMBER,
+                             TransactionField.TRANSACTION_INDEX,
+                             TransactionField.HASH,
+                             TransactionField.FROM,
+                             TransactionField.TO
+                             ],
+                block=[el.value for el in hypersync.BlockField]
+            )
+        )
 
         # DATA ORGANIZTION
         tx_data = []
@@ -164,6 +140,8 @@ class Hypersync:
         log_data = []
         block_data = []
 
+        print(f'starting to run query from block {
+              start_block} to block {end_block}')
         # While loop for pagination
         while True:
             res = await self.client.send_req(query)
@@ -198,13 +176,15 @@ class Hypersync:
             block_data.extend(res.data.blocks)
 
             # Check if the fetched data has reached the current archive height or next block.
-            if res.archive_height < res.next_block:
+            if end_block == res.next_block:
                 # Exit the loop if the end of the period (or the blockchain's current height) is reached.
                 break
 
             # Update the query to fetch the next set of data starting from the next block.
             query.from_block = res.next_block
-            print(f"Scanned up to block {query.from_block}")  # Log progress.
+            # print(f"archive height: {res.archive_height}")  # Log progress. # archive_height is the newest height of the block
+            # print(f"next block: {res.next_block}")  # Log progress.
+            # print(f"from block: {query.from_block}")  # Log progress.
 
         return {
             "tx_data": tx_data,

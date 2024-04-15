@@ -12,6 +12,7 @@ dependencies = [
     "ipykernel>=6.29.4",
     "nest_asyncio>=1.6.0",
     "lancedb>=0.6.8",
+    "duckdb>=0.10.1",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
