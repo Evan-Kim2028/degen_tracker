@@ -48,6 +48,7 @@ class LanceDBLogs:
             end_block: int = asyncio.run(client.get_block_height())
 
         for block in range(start_block, end_block, block_chunks):
+            erc20_logs_df = None
             if block + block_chunks > end_block:
                 print('break!')
                 break
@@ -58,6 +59,7 @@ class LanceDBLogs:
             erc20_logs_df = client.get_erc20_df(
                 start_block=block, end_block=block+block_chunks)
 
+            print('rows being added:', erc20_logs_df.shape)
             self.create_db(erc20_logs_df)
 
             # update db based on chunked info
