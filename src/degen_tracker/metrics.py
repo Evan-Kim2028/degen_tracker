@@ -42,8 +42,7 @@ class Metrics:
         db: lancedb.DBConnection = lancedb.connect(uri)
         logs_tbl = db.open_table(uri)
 
-        # convert dataset to table (full in memory)
-        table = logs_tbl.to_pandas()
-        pl_df = pl.from_pandas(table)
+        # convert dataset to table
+        pl_df = logs_tbl.to_polars()
 
-        return pl_df.sort(by='block_number', descending=True).group_by('block_number').agg(pl.len().alias('transfers_count')).sort(by='block_number', descending=True)
+        return pl_df.sort(by='block_number', descending=True).group_by('block_number').agg(pl.len().alias('transfers_count')).sort(by='block_number', descending=True).collect()
