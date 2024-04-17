@@ -22,19 +22,8 @@ except Exception as e:
     # Exit the script or handle the error as needed
     raise SystemExit(e)
 
-# If the table was successfully opened, proceed with further operations
-ds = logs_tbl.to_lance()
-try:
-    resume_block_number: int = duckdb.query(
-        """
-    SELECT max(block_number)
-    FROM ds
-    """
-    ).fetchall()[0][0]
-except Exception as e:
-    print(f"Error querying the database: {e}")
-    raise SystemExit(e)
-
+resume_block_number = pl_df = logs_tbl.to_polars().select('block_number').sort(
+    by='block_number', descending=True).collect()['block_number'][0]
 print(resume_block_number)
 
 # Resume the query from resume_block_number
