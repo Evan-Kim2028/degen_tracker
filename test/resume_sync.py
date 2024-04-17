@@ -23,7 +23,7 @@ except Exception as e:
     raise SystemExit(e)
 
 resume_block_number = pl_df = logs_tbl.to_polars().select('block_number').sort(
-    by='block_number', descending=True).collect()['block_number'][0]
+    by='block_number', descending=True).head(5).collect()['block_number'][0]
 print(resume_block_number)
 
 # Resume the query from resume_block_number
@@ -32,7 +32,7 @@ start_time = time.time()
 # Initialize this dataclass, which will be used to build the logs database
 lance_logs = LanceDBLogs()
 lance_logs.db_sync(
-    start_block=resume_block_number, block_chunks=5000)
+    start_block=resume_block_number, block_chunks=2500)
 
 print('Time took to sync base erc20 logs:', time.time() - start_time)
 

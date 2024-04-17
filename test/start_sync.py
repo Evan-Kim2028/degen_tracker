@@ -9,7 +9,7 @@ sart_time = time.time()
 lance_logs = LanceDBLogs()
 
 # initial db sync. Set start block = 2000000 for full sync. Setting at 0 crashes because not all block chunk ranges had a tx/log inside of it at the genesis of the chain.
-lance_logs.db_sync(start_block=2000000, block_chunks=10000)
+lance_logs.db_sync(start_block=2000000, block_chunks=2500)
 
 print('time took to sync base erc20 logs:',
       time.time() - sart_time)
