@@ -3,13 +3,28 @@ import hypersync
 import asyncio
 import time
 from hypersync import TransactionField, LogField
+from typing import Union, List
 
 # Sample stand alone script to fetch erc20 tokens and print relevant decoded values.
-# Modified from this example - https://github.com/enviodev/hypersync-client-python/blob/main/examples/all-erc20.py
+# Modified from this example - https://github.com/enviodev/hypersync-client-python/blob/main/examples/wallet.py
+
+def address_to_topic(address: Union[str, List[str]]) -> Union[str, List[str]]:
+    if isinstance(address, list):
+        return ["0x000000000000000000000000" + addr[2:] for addr in address]
+    else:
+        return "0x000000000000000000000000" + address[2:]
+
+# Examples of using the modified function
+# Single address
+single_address = "0xe9825fd47c5d863b1aecba3707abcc7c8b49b88d".lower()
+print(address_to_topic(single_address))
 
 
-async def fetch_erc20s():
+### WIP
+async def wallet_balance():
     client = hypersync.HypersyncClient("https://base.hypersync.xyz")
+    # Get the current block height from the blockchain.
+    height = await client.get_height()
 
     # The query to run
     query = hypersync.Query(
@@ -82,5 +97,5 @@ async def fetch_erc20s():
 
 
 start_time = time.time()
-asyncio.run(fetch_erc20s())
+asyncio.run(wallet_balance())
 print("--- %s seconds ---" % (time.time() - start_time))
