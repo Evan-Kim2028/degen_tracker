@@ -49,11 +49,11 @@ class LanceDBLogs:
 
         for block in range(start_block, end_block, block_chunks):
             print('block')
-            erc20_logs_df = None
             progress_percent = (block / end_block) * 100
-            print('progress: ', round(progress_percent, 3), '%')
+            print('progress: ', round(progress_percent, 3),
+                  '%', 'block" ', block,)
             erc20_logs_df = client.get_erc20_df(
-                sync_all=True, start_block=block, end_block=block+block_chunks)
+                sync_all=True, start_block=block, end_block=end_block)
             # update db based on chunked info
             self.update_db(erc20_logs_df)
 
@@ -83,6 +83,10 @@ class LanceDBLogs:
         # check if db exists. If it doesn't, then create it
         self.create_db(update_df)
 
+        self.logs_tbl.compact_files()
+        self.logs_tbl.to_lance().optimize.optimize_indices()
+        self.logs_tbl.cleanup_old_versions(datetime.timedelta(seconds=60))
+
         # Perform a "upsert" operation
         self.logs_tbl.merge_insert(merge_on)   \
             .when_not_matched_insert_all() \
@@ -91,7 +95,6 @@ class LanceDBLogs:
         # lance db cleanup
         # make table fragments compact
         # 1m target rows per file
-        # self.logs_tbl.compact_files(target_rows_per_fragment=1000000)
 
         self.logs_tbl.cleanup_old_versions(
             older_than=datetime.timedelta(seconds=600), delete_unverified=True

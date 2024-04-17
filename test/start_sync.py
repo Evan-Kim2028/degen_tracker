@@ -1,6 +1,8 @@
 from degen_tracker.lance import LanceDBLogs
 import time
 
+# starts a full historical sync. Currently slow because hypersync doesn't implement parallelization with current method being used. 
+# Also lancedb has a bug that doesn't handle memory properly, so always ends up running out of memory to write files.
 
 sart_time = time.time()
 # initialize this dataclass, which will be used to build the logs database
