@@ -92,6 +92,7 @@ class Hypersync:
         logs_df = pl.from_dicts(joined_logs)
         tx_df = pl.from_dicts(tx_data)
 
+        # this join is an expensive operation memory wise
         return logs_df.join(tx_df, on=["tx_hash", 'block_number'], how="left").rename({'body': 'value_transferred'})
 
     async def fetch_erc20s(self, start_block: int, end_block: int) -> dict[str]:
