@@ -29,7 +29,7 @@ class LanceDBLogs:
                     f"Table {self.uri} does not exist. Consider creating it if this is expected.")
                 self.logs_tbl = None
 
-    def db_sync(self, start_block: int, end_block: int = None, block_chunks=10000):
+    def db_sync(self, start_block: int, end_block: int = None, block_chunks=25000):
         """
         Initializes the database and syncs the logs table based on the specified sync range.
 
@@ -48,12 +48,15 @@ class LanceDBLogs:
             end_block: int = asyncio.run(client.get_block_height())
 
         for block in range(start_block, end_block, block_chunks):
-            print('block')
+            if block + block_chunks > end_block:
+                print('break!')
+                break
+
             progress_percent = (block / end_block) * 100
             print('progress: ', round(progress_percent, 3),
                   '%', 'block" ', block,)
             erc20_logs_df = client.get_erc20_df(
-                sync_all=True, start_block=block, end_block=end_block)
+                start_block=block, end_block=block+block_chunks)
             # update db based on chunked info
             self.update_db(erc20_logs_df)
 

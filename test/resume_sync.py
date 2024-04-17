@@ -43,7 +43,7 @@ start_time = time.time()
 # Initialize this dataclass, which will be used to build the logs database
 lance_logs = LanceDBLogs()
 lance_logs.db_sync(
-    start_block=resume_block_number, block_chunks=25000)
+    start_block=resume_block_number, block_chunks=5000)
 
 print('Time took to sync base erc20 logs:', time.time() - start_time)
 

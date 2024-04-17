@@ -39,7 +39,7 @@ class Hypersync:
         """
         return await self.client.get_height()
 
-    def get_erc20_df(self, sync_all: bool, start_block: int, end_block: int) -> pl.DataFrame:
+    def get_erc20_df(self, start_block: int, end_block: int) -> pl.DataFrame:
         """
         sync_erc20s() is a synchronous wrapper function around the asynchronous fetch_erc20s() function.
 
@@ -58,15 +58,8 @@ class Hypersync:
                     "block_data": block_data
                 }
         """
-
-        match sync_all:
-            case True:
-                data_dict = asyncio.run(self.fetch_erc20s(start_block=start_block,
-                                                          end_block=end_block))
-            case False:
-                data_dict = asyncio.run(self.fetch_erc20s(start_block=start_block,
-                                                          end_block=end_block))
-
+        data_dict = asyncio.run(self.fetch_erc20s(start_block=start_block,
+                                                  end_block=end_block))
         # data transformations
         joined_logs = []
         # check if data_dict["log_data"] is None. If it is, then pass
@@ -140,8 +133,8 @@ class Hypersync:
         log_data = []
         block_data = []
 
-        print(f'starting to run query from block {
-              start_block} to block {end_block}')
+        print(f"""starting to run query from block {start_block} to block {
+              end_block}. {end_block - start_block} blocks to fetch.""")
         # While loop for pagination
         while True:
             res = await self.client.send_req(query)
@@ -182,9 +175,10 @@ class Hypersync:
 
             # Update the query to fetch the next set of data starting from the next block.
             query.from_block = res.next_block
-            # print(f"archive height: {res.archive_height}")  # Log progress. # archive_height is the newest height of the block
-            # print(f"next block: {res.next_block}")  # Log progress.
-            # print(f"from block: {query.from_block}")  # Log progress.
+            # Log progress. # archive_height is the newest height of the block
+            # print(f"archive height: {res.archive_height}")
+            # print(f"from block: {query.from_block}")
+            # print(f"up to block: {end_block}")
 
         return {
             "tx_data": tx_data,
