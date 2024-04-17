@@ -54,9 +54,12 @@ class LanceDBLogs:
 
             progress_percent = (block / end_block) * 100
             print('progress: ', round(progress_percent, 3),
-                  '%', 'block" ', block,)
+                  '%', 'block ', block, "/", end_block)
             erc20_logs_df = client.get_erc20_df(
                 start_block=block, end_block=block+block_chunks)
+
+            self.create_db(erc20_logs_df)
+
             # update db based on chunked info
             self.update_db(erc20_logs_df)
 

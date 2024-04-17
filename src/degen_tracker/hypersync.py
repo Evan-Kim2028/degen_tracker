@@ -88,6 +88,7 @@ class Hypersync:
                 }
             )
 
+
         logs_df = pl.from_dicts(joined_logs)
         tx_df = pl.from_dicts(tx_data)
 
